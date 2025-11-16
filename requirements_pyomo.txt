@@ -1,0 +1,21 @@
+# Requirements for CSTR Optimal Control with Pyomo
+
+# Core optimization
+pyomo>=6.4.0
+
+# Numerical computing
+numpy>=1.21.0
+
+# Data manipulation
+pandas>=1.3.0
+
+# Plotting
+matplotlib>=3.4.0
+seaborn>=0.11.0
+
+# Optional: For better plotting
+scipy>=1.7.0
+
+# Note: IPOPT solver needs to be installed separately
+# Use: conda install -c conda-forge ipopt
+# Or download from: https://github.com/coin-or/Ipopt/releases
