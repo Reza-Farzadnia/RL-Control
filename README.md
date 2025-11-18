@@ -1,21 +1,16 @@
 # RL – Research Workspace
 
-Organized project for DRTO/RL-DRTO research on a PI-controlled CSTR.
+Organized project for DRTO/RL-DRTO research on a CSTR Case srudy.
 
 Directory layout
-- `tex/` – LaTeX sources
-  - `build/` – LaTeX auxiliary files (auto-managed by `latexmkrc`)
-- `docs/models/` – Built PDFs (compiled from `tex/`)
-- `docs/figures/` – Figures used in LaTeX and reports
-- `data/` – CSV and other result data
-- `src/` – Python source code (planned)
-- `tests/` – Unit tests (planned)
-- `scripts/` – Helper scripts (e.g., build docs)
+- `Documents/` – Figures and documentation for the CSTR case
+  - `figures/` – Plot images (e.g., CSTR profiles and results)
+  - `models/` – PDF documents (e.g., DRTO formulations)
+- `Examples/` – Example codes and tutorials
+  - `RL_Control_codes/PID_CSTR/` – CSTR optimal control and RL-DRTO examples
+  - `RL_codes/` – Standalone RL examples (e.g., `ToyExmaple-1D`)
+- `data/` – CSV files with example results and parameters
 
-Build docs
-- Use `make docs` or run `scripts/build_docs.sh`.
-- Aux files go to `tex/build`; PDFs go to `docs/models`.
-
-Notes
-- LaTeX builds are configured via `latexmkrc` at the repo root.
-- Figures are resolved via `\graphicspath` to `docs/figures/`.
+**Citation / Research Use**
+- If you use this repository for academic or research purposes (e.g., publications, theses, reports, or presentations), please cite:
+  - Reza Farzadnia, "RL-Control", GitHub repository, https://github.com/Reza-Farzadnia/RL-Control.

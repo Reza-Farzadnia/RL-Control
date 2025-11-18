@@ -2,10 +2,10 @@ import numpy as np
 
 # Simple 1D Grid World Environment
 class GridWorld:
-    def __init__(self, size=8):
-        self.size = size
+    def __init__(self, world_size):
+        self.size = world_size
         self.start = 0
-        self.goal = size - 1
+        self.goal = world_size - 1
         self.state = self.start
 
     def reset(self):
@@ -41,10 +41,11 @@ class QLearningAgent:
         self.q_table[state, action] += self.alpha * (target - predict)
 
 # Training loop
-env = GridWorld(size=8)
-agent = QLearningAgent(n_states=8, n_actions=2)
+world_size = 7
+env = GridWorld(world_size)
+agent = QLearningAgent(n_states=world_size, n_actions=2)
 
-episodes = 100
+episodes = 20
 for ep in range(episodes):
     # print("Learn:", ep)
     state = env.reset()
