@@ -13,6 +13,7 @@ Author: Converted from Julia/JuMP to Python/Pyomo
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from pathlib import Path
 from pyomo.environ import *
 from pyomo.opt import SolverFactory
 
@@ -344,7 +345,7 @@ def extract_results(model, p):
 # PLOTTING
 # =============================================================================
 
-def plot_results(df, save_path='cstr_results.png'):
+def plot_results(df, save_path):
     """Create publication-quality plots of the results"""
 
     # Set plot style
@@ -433,13 +434,22 @@ def main():
     # Solve model
     results = solve_model(model, solver_name='ipopt')
 
+    # Resolve repository paths so saves work regardless of CWD
+    repo_root = Path(__file__).resolve().parents[3]
+    data_dir = repo_root / "data"
+    figures_dir = repo_root / "docs" / "figures"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    figures_dir.mkdir(parents=True, exist_ok=True)
+
     # Extract and save results
     df = extract_results(model, params)
-    df.to_csv('cstr_results.csv', index=False)
-    print("Results saved to: cstr_results.csv")
+    csv_path = data_dir / "PI_CSTR_results.csv"
+    df.to_csv(csv_path, index=False)
+    print(f"Results saved to: {csv_path}")
 
     # Plot results
-    plot_results(df, save_path='cstr_results.png')
+    fig_path = figures_dir / "PI_CSTR_results.png"
+    plot_results(df, save_path=fig_path)
 
     print("\n" + "="*60)
     print("EXECUTION COMPLETED SUCCESSFULLY")
