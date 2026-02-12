@@ -14,6 +14,7 @@ Date: 2025-11-24
 """
 
 import time
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from pyomo.environ import *
@@ -51,6 +52,7 @@ class Params:
     S = 0.1              # Move suppression weight 
     W_econ = 10.0        # Economic steady-state penalty weight
     W_target = 5.0       # RTO bias toward h_target
+    W_safe = 1000.0      # Safety slack penalty weight
 
 
 # =============================================================================
@@ -79,7 +81,7 @@ def solve_rto(params):
     m.safety_slack = Var(domain=NonNegativeReals, initialize=0.0)
 
     # Objective: minimize steady-state flow cost + soft safety penalty
-    w_safe = getattr(params, "w_safe", 1e3)  # penalty weight
+    w_safe = getattr(params, "W_safe", 1e3)  # penalty weight
     m.obj = Objective(
         expr=(
             params.c_flow * m.F_in_ss
@@ -133,7 +135,8 @@ def create_mpc_model(params, h_sp, F_in_ss):
     m.K = RangeSet(0, params.N)
 
     # Variables
-    m.h = Var(m.K, bounds=(params.h_safety, params.h_max))
+    m.h = Var(m.K, bounds=(params.h_min, params.h_max))
+    m.safety_slack = Var(m.K, domain=NonNegativeReals)
     m.F_in = Var(m.K, bounds=(params.F_in_min, params.F_in_max))
     m.F_out = Var(m.K, bounds=(0, 2.0))
 
@@ -150,7 +153,10 @@ def create_mpc_model(params, h_sp, F_in_ss):
         # This makes MPC "aware" of long-term economic target
         terminal_econ_penalty = params.W_econ * (m.h[params.N] - h_sp)**2
 
-        return tracking_cost + move_cost + terminal_econ_penalty
+        # 4. Soft safety penalty via slack
+        safety_penalty = sum(params.W_safe * m.safety_slack[k] for k in m.K)
+
+        return tracking_cost + move_cost + terminal_econ_penalty + safety_penalty
 
     m.obj = Objective(rule=obj_rule, sense=minimize)
 
@@ -169,6 +175,11 @@ def create_mpc_model(params, h_sp, F_in_ss):
     def outflow_rule(m, k):
         return m.F_out[k] == params.k_v * sqrt(m.h[k])
     m.outflow = Constraint(m.K, rule=outflow_rule)
+
+    # Soft safety constraint (h >= h_safety - slack)
+    def safety_soft_rule(m, k):
+        return m.h[k] + m.safety_slack[k] >= params.h_safety
+    m.safety_soft = Constraint(m.K, rule=safety_soft_rule)
 
     # Rate limits
     def rate_upper_rule(m, k):
@@ -205,7 +216,7 @@ if __name__ == "__main__":
     print(f"  Time step:          dt = {params.dt} s")
     print()
     print(f"Limits:")
-    print(f"  Level:              [{params.h_safety}, {params.h_max}] m")
+    print(f"  Level:              [{params.h_min}, {params.h_max}] m (safety soft at {params.h_safety} m)")
     print(f"  Input:              [{params.F_in_min}, {params.F_in_max}] m^3/s")
     print(f"  Rate limit:         +/- {params.delta_F_max} m^3/s")
     print()
@@ -214,6 +225,7 @@ if __name__ == "__main__":
     print(f"  Tracking weight:    Q = {params.Q}")
     print(f"  Move suppression:   S = {params.S}")
     print(f"  Economic penalty:   W_econ = {params.W_econ} (suboptimality mitigation)")
+    print(f"  Safety penalty:     W_safe = {params.W_safe} (soft safety slack)")
     print()
     print(f"Initial condition:")
     print(f"  Initial level:      h_0 = {params.h_0} m")
@@ -288,10 +300,10 @@ if __name__ == "__main__":
     print()
 
     # Plot results
-    fig, axes = plt.subplots(3, 1, figsize=(12, 10))
+    fig, axes = plt.subplots(3, 1, figsize=(6, 10))
 
     # Panel 1: Tank Level
-    axes[0].plot(time, h, 'b-', linewidth=2, label='Level h(t)', marker='o', markersize=4)
+    axes[0].plot(time, h, 'b-', linewidth=2, label='Level h(t)')
     axes[0].axhline(h_sp, color='g', linestyle='--', linewidth=1.5,
                    label=f'RTO Setpoint = {h_sp:.2f} m')
     axes[0].axhline(params.h_safety, color='r', linestyle='-', linewidth=2,
@@ -304,8 +316,8 @@ if __name__ == "__main__":
     axes[0].grid(True, alpha=0.3)
 
     # Panel 2: Flows
-    axes[1].step(time, F_in, 'g-', linewidth=2, where='post', label='Input F_in(t)', marker='s', markersize=4)
-    axes[1].plot(time, F_out, 'm-', linewidth=2, label='Output F_out(t) = k_v*sqrt(h)', marker='o', markersize=4)
+    axes[1].step(time, F_in, 'g-', linewidth=2, where='post', label='Input F_in(t)')
+    axes[1].plot(time, F_out, 'm-', linewidth=2, label='Output F_out(t) = k_v*sqrt(h)')
     axes[1].axhline(F_in_ss, color='r', linestyle='--', linewidth=1.5,
                    label=f'RTO steady-state = {F_in_ss:.4f} m^3/s')
     axes[1].set_xlabel('Time [s]')
@@ -315,7 +327,7 @@ if __name__ == "__main__":
     axes[1].grid(True, alpha=0.3)
 
     # Panel 3: Input Rate
-    axes[2].plot(time[1:], delta_F, 'r-', linewidth=2, label='ΔF_in', marker='o', markersize=4)
+    axes[2].plot(time[1:], delta_F, 'r-', linewidth=2, label='ΔF_in')
     axes[2].axhline(params.delta_F_max, color='k', linestyle='--', linewidth=1.5,
                    label=f'+{params.delta_F_max} m^3/s')
     axes[2].axhline(-params.delta_F_max, color='k', linestyle='--', linewidth=1.5,
@@ -328,4 +340,13 @@ if __name__ == "__main__":
     axes[2].grid(True, alpha=0.3)
 
     plt.tight_layout()
+
+    output_dir = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "figures", "result"
+    )
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "result.png")
+    fig.savefig(output_path, dpi=150)
+    print(f"Saved figure to {output_path}")
+
     plt.show()
